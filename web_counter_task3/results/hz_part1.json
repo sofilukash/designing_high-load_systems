@@ -1,0 +1,42 @@
+{
+  "nolock": {
+    "key": "nolock",
+    "name": "Map без блокувань",
+    "seconds": 74.05505927900003,
+    "rate": 1350.3466336209824,
+    "final": 17802,
+    "expected": 100000,
+    "lost": 82198,
+    "retries": 0
+  },
+  "pessimistic": {
+    "key": "pessimistic",
+    "name": "Map + песимістичне блокування",
+    "seconds": 267.18363461900026,
+    "rate": 374.27442044718964,
+    "final": 100000,
+    "expected": 100000,
+    "lost": 0,
+    "retries": 0
+  },
+  "optimistic": {
+    "key": "optimistic",
+    "name": "Map + оптимістичне блокування",
+    "seconds": 401.34086295199995,
+    "rate": 249.1647605092231,
+    "final": 100000,
+    "expected": 100000,
+    "lost": 0,
+    "retries": 298874
+  },
+  "atomic": {
+    "key": "atomic",
+    "name": "IAtomicLong (CP Subsystem)",
+    "seconds": 49.02175800999976,
+    "rate": 2039.9105225806343,
+    "final": 100000,
+    "expected": 100000,
+    "lost": 0,
+    "retries": 0
+  }
+}

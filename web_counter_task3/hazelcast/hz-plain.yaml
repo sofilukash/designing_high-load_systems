@@ -1,0 +1,15 @@
+hazelcast:
+  network:
+    interfaces:
+      enabled: true
+      interfaces:
+        - 127.0.0.1
+    join:
+      multicast:
+        enabled: false
+      tcp-ip:
+        enabled: true
+        member-list:
+          - 127.0.0.1:5701
+          - 127.0.0.1:5702
+          - 127.0.0.1:5703
