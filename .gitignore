@@ -6,3 +6,7 @@ counter.dat
 __pycache__/
 *.pyc
 counter.dat
+.venv/
+__pycache__/
+*.pyc
+counter.dat
