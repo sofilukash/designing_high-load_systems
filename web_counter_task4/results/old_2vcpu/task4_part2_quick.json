@@ -1,0 +1,40 @@
+{
+  "w1": {
+    "key": "w1",
+    "name": "writeConcern = 1",
+    "w": "1",
+    "kill": false,
+    "seconds": 5.623466286999246,
+    "rate": 1778.262639027241,
+    "acked": 10000,
+    "final": 10000,
+    "expected": 10000,
+    "lost": 0,
+    "extra": 0,
+    "client_errors": 0,
+    "error_kinds": {},
+    "killed": null,
+    "first_primary": "127.0.0.1:27018",
+    "new_primary": "—",
+    "failover_gap": null
+  },
+  "wmajority": {
+    "key": "wmajority",
+    "name": "writeConcern = majority",
+    "w": "majority",
+    "kill": false,
+    "seconds": 19.354906771999595,
+    "rate": 516.6648497871778,
+    "acked": 10000,
+    "final": 10000,
+    "expected": 10000,
+    "lost": 0,
+    "extra": 0,
+    "client_errors": 0,
+    "error_kinds": {},
+    "killed": null,
+    "first_primary": "127.0.0.1:27018",
+    "new_primary": "—",
+    "failover_gap": null
+  }
+}
