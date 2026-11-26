@@ -1,0 +1,116 @@
+"""
+Веб-застосунок «лічильник». Лише стандартна бібліотека Python.
+Ендпоінти:
+    GET /inc     збільшити лічильник на 1
+    GET /count   повернути поточне значення
+    GET /reset   обнулити (службовий, потрібен клієнту-бенчмарку для чистого старту)
+Запуск:
+    python -m app.server --mode memory            # лічильник у пам'яті
+    python -m app.server --mode disk              # лічильник у файлі
+    python -m app.server --mode postgres          # лічильник у PostgreSQL
+    python -m app.server --mode hazelcast         # лічильник у Hazelcast (IAtomicLong, CP Subsystem)
+    python -m app.server --mode mongodb           # лічильник у MongoDB (findOneAndUpdate, writeConcern majority)
+    python -m app.server --mode cassandra --cass-cl QUORUM   # лічильник у Cassandra (тип counter, RF=3, consistency ONE/QUORUM)
+"""
+import argparse
+import os
+import signal
+import threading
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+from app.counters import (CASSANDRA_HOSTS, DEFAULT_DSN, HAZELCAST_CLUSTER, HAZELCAST_MEMBERS, MONGO_URI,
+                          CassandraCounter, DiskCounter, HazelcastCounter, MemoryCounter, MongoCounter,
+                          PostgresCounter)
+
+def make_handler(counter): #Створює клас-обробник запитів, прив'язаний до конкретного лічильника
+
+    class Handler(BaseHTTPRequestHandler):
+        protocol_version = "HTTP/1.1"
+        disable_nagle_algorithm = True
+
+        def _reply(self, status: int, body: bytes) -> None:
+            self.send_response(status)
+            self.send_header("Content-Type", "text/plain")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def do_GET(self):
+            try:
+                if self.path == "/inc":
+                    counter.inc()
+                    self._reply(200, b"ok\n")
+                elif self.path == "/count":
+                    self._reply(200, b"%d\n" % counter.get())
+                elif self.path == "/reset":
+                    counter.reset()
+                    self._reply(200, b"0\n")
+                else:
+                    self._reply(404, b"not found\n")
+            except Exception as e:
+                self._reply(500, str(e).encode() + b"\n")
+
+        def log_message(self, *args):
+            pass
+
+    return Handler
+
+class CounterServer(ThreadingHTTPServer):
+    daemon_threads = True
+    allow_reuse_address = True
+    request_queue_size = 256
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(description="Web-counter: /inc і /count")
+    ap.add_argument("-m", "--mode", choices=["memory", "disk", "postgres", "hazelcast", "mongodb", "cassandra"], default="memory",
+                    help="де зберігати лічильник (за замовчуванням: memory)")
+    ap.add_argument("--host", default="127.0.0.1")
+    ap.add_argument("-p", "--port", type=int, default=8080)
+    ap.add_argument("-f", "--file", default="counter.dat", help="файл лічильника (режим disk)")
+    ap.add_argument("--dsn", default=DEFAULT_DSN, help="рядок підключення до PostgreSQL (режим postgres)")
+    ap.add_argument("--hz-members", default=HAZELCAST_MEMBERS,
+                    help="адреси нод Hazelcast через кому (режим hazelcast)")
+    ap.add_argument("--hz-cluster", default=HAZELCAST_CLUSTER, help="ім'я кластера Hazelcast (режим hazelcast)")
+    ap.add_argument("--mongo-uri", default=MONGO_URI, help="рядок підключення до MongoDB (режим mongodb)")
+    ap.add_argument("--mongo-w", default="majority", help="writeConcern для findOneAndUpdate: 1, 2, 3 або majority")
+    ap.add_argument("--cass-hosts", default=CASSANDRA_HOSTS, help="адреси нод Cassandra через кому (режим cassandra)")
+    ap.add_argument("--cass-cl", default="ONE", choices=["ONE", "TWO", "THREE", "QUORUM", "ALL"],
+                    help="consistency level запису інкремента (режим cassandra)")
+    ap.add_argument("--nofsync", action="store_true",
+                    help="режим disk БЕЗ fsync — лише для експериментів, порушує гарантію запису!")
+    args = ap.parse_args()
+
+    if args.mode == "memory":
+        counter = MemoryCounter()
+    elif args.mode == "disk":
+        counter = DiskCounter(args.file, fsync=not args.nofsync)
+    elif args.mode == "postgres":
+        counter = PostgresCounter(args.dsn)
+    elif args.mode == "hazelcast":
+        counter = HazelcastCounter(args.hz_members, args.hz_cluster)
+    elif args.mode == "mongodb":
+        counter = MongoCounter(args.mongo_uri, args.mongo_w)
+    else:
+        counter = CassandraCounter(args.cass_hosts, args.cass_cl)
+
+    server = CounterServer((args.host, args.port), make_handler(counter))
+
+    def stop(*_):
+        # shutdown() не можна викликати з того ж потоку, де працює serve_forever()
+        threading.Thread(target=server.shutdown, daemon=True).start()
+
+    signal.signal(signal.SIGINT, stop)  # Ctrl+C
+    signal.signal(signal.SIGTERM, stop)
+
+    extra = f" cl={args.cass_cl}" if args.mode == "cassandra" else ""
+    print(f"mode={args.mode}{extra} http://{args.host}:{args.port} pid={os.getpid()}", flush=True)
+    try:
+        server.serve_forever()
+    finally:
+        server.server_close()
+        counter.close()
+
+
+if __name__ == "__main__":
+    main()
